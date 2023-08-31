@@ -5,5 +5,4 @@ from .models import *
 admin.site.register(CustomUser)
 admin.site.register(ParkingSlot)
 admin.site.register(ParkingLot)
-
-
+admin.site.register(ParkingRate)

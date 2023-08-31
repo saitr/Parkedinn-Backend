@@ -11,6 +11,11 @@ urlpatterns = [
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('user_list/',views.UserList.as_view(),name="userlist"),
     # path('send-otp/', views.SendOTP.as_view(), name='send-otp'),
+
+    ########################## Admin urls ###########################
+
+    path('admin-signup/', views.AdminSignupView.as_view(), name='admin-signup'),
+
     ################## parking lot urls ############
     path('nearest_parking_lots/', NearbyParkingLots.as_view(), name='nearest_parking_lots'),
     path('parking_lot_create/',ParkingLotCreateView.as_view(),name='create_parking_create'),
@@ -27,4 +32,5 @@ urlpatterns = [
     ################ subscribing and contact us #######################
     path('subscriber/',SubscriberView.as_view(),name='subscriber'),
     path('contactus/',ContactUsView.as_view(),name='contactus'),
+    path('parking_rates_all/',ParkingRateCreate.as_view(),name='parking-rates'),
 ]

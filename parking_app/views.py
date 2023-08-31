@@ -131,6 +131,18 @@ class UserList(generics.ListAPIView):
     
 
 
+###################### Admin Signup View #########################
+
+
+class AdminSignupView(APIView):
+    def post(self, request):
+        serializer = AdminSignupSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 # views.py
 # import random
 # from rest_framework.views import APIView

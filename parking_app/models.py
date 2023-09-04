@@ -41,6 +41,7 @@ class ParkingLot(models.Model):
         ('INDOOR','Indoor'),
         ('OUTDOOR','Outdoor')
     )
+    user = models.ForeignKey(CustomUser,on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     address = models.CharField(max_length=200)
     description = models.TextField(blank=True,null=True)
@@ -105,7 +106,7 @@ class ParkingSlot(models.Model):
         ('Heavy Vechiles','Heavy Vechiles')
     )
     parking_lot = models.ForeignKey(ParkingLot, on_delete=models.CASCADE)
-    slot_number = models.CharField(max_length=10,unique=True)
+    slot_number = models.CharField(max_length=10)
     is_available = models.BooleanField(default=True)
     parking_slot_type = models.CharField('Parking Slot Type',max_length=30,choices=VEHICLE_CHOICES)
     def __str__(self):
@@ -119,7 +120,7 @@ class ParkingBilling(models.Model):
     vehicle_number = models.CharField(max_length=20,null=True)
     start_time = models.DateTimeField(null=True,default=timezone.now)
     end_time = models.DateTimeField(null=True,default=timezone.now)
-    elapsed_time = models.CharField(null=True,blank=True,max_length=20)
+    # elapsed_time = models.CharField(null=True,blank=True,max_length=20)
     total_cost = models.DecimalField(max_digits=10, decimal_places=3)
 
     def formatted_start_time(self):
@@ -135,7 +136,7 @@ class FinalBilling(models.Model):
     vehicle_number = models.CharField(max_length=20,null=True)
     start_time = models.DateTimeField(null=True,default=timezone.now)
     end_time = models.DateTimeField(null=True,default=timezone.now)
-    elapsed_time = models.CharField(null=True,blank=True,max_length=20)
+    # elapsed_time = models.CharField(null=True,blank=True,max_length=20)
     total_cost = models.DecimalField(max_digits=10, decimal_places=2)
 
     def formatted_start_time(self):

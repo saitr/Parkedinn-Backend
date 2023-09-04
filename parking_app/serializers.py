@@ -49,7 +49,7 @@ class ParkingLotSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ParkingLot
-        fields = ['id', 'name', 'address', 'description', 'image', 'latitude', 'longitude','available_slots','parking_type']
+        fields = ['id', 'name', 'address', 'description', 'image', 'latitude', 'longitude','available_slots','parking_type','user']
 
 
 ################ Parking Slot Serializer ###############
@@ -57,10 +57,14 @@ class ParkingLotSerializer(serializers.ModelSerializer):
 class ParkingSlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = ParkingSlot
-        fields = '__all__'
-        depth = 2
+        fields = ['id','parking_lot','slot_number','parking_slot_type','is_available']
+        # depth = 2
 
-
+class ParkingSlotListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ParkingSlot
+        fields = ['id','parking_lot','slot_number','parking_slot_type','is_available']
+        depth=2
 
 ########################## Billing Serializer ######################
 
@@ -147,7 +151,7 @@ class ParkingRateSerializer(serializers.ModelSerializer):
 
 
 
-################# Admin signup ######################
+################# Admin signup Serializer ######################
 
 
 class AdminSignupSerializer(serializers.ModelSerializer):
@@ -167,5 +171,22 @@ class AdminSignupSerializer(serializers.ModelSerializer):
         return user
 
 
-    
+#################### Staff Signup Serializer ##########################
 
+class StaffSignupSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = CustomUser
+        fields = ('id', 'email', 'username', 'phone_number', 'password',)
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = CustomUser.objects.create_user(
+            password=password,
+            is_staff = True,
+            is_superuser=False,  # Set is_superuser to False for staff user
+            **validated_data,
+            is_active=True  # You might want to ensure the user is active as well
+        )
+        return user

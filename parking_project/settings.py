@@ -32,7 +32,7 @@ DEBUG = True
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-# CSRF_TRUSTED_ORIGINS = ['http://localhost:3000/']
+CSRF_TRUSTED_ORIGINS = ['http://localhost:3000/','http://192.168.43.26:3000/']
 
 CORS_ORIGIN_ALLOW_ALL=True
 

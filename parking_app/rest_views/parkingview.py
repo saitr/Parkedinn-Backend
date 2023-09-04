@@ -2,12 +2,13 @@ from geopy.distance import geodesic
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from parking_app.models import *
-from parking_app.serializers import ParkingLotSerializer, ParkingSlotSerializer,ParkingBillingSerializer, ParkingBillingDetailSerializer,ContactUsSerializer,SubscriberSerializer,FinalBillingSerializer
+from parking_app.serializers import ParkingLotSerializer, ParkingSlotSerializer,ParkingBillingSerializer, ParkingBillingDetailSerializer,ContactUsSerializer,SubscriberSerializer,FinalBillingSerializer,ParkingRateSerializer, ParkingSlotListSerializer
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, IsAdminUser,AllowAny
 from rest_framework import generics
 import requests
+from parking_app.permissions import *
 
 
 
@@ -51,28 +52,45 @@ import requests
 ############# Parking Lot Creation Api ##################
 
 class ParkingLotCreateView(APIView):
-    permission_classes = [IsAdminUser]
-    
+    permission_classes = [CanCreateParkingLot]
+
     def post(self, request, format=None):
-        serializer = ParkingLotSerializer(data=request.data)
+        user = request.user
+        data = request.data.copy()  # Make a copy of the request data
+        data['user'] = user.id  # Set the user ID
+        
+        serializer = ParkingLotSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-
 ############### Parking Lot List ########################
-from django.db.models import Count
+from django.db.models import Count, Q
+# class ParkingLotList(generics.ListAPIView):
+#     queryset = ParkingLot.objects.annotate(available_slots=Count('parkingslot', filter=models.Q(parkingslot__is_available=True))).order_by('id')
+#     serializer_class = ParkingLotSerializer
+    
+#     def list(self, request, *args, **kwargs):
+#         response = super().list(request, *args, **kwargs)
+#         data = response.data
+#         # print('parking lot',data)
+#         for item in data:
+#             item['available_slots'] = item.pop('available_slots')
+#         return Response(data)
 
 class ParkingLotList(generics.ListAPIView):
-    queryset = ParkingLot.objects.annotate(available_slots=Count('parkingslot', filter=models.Q(parkingslot__is_available=True))).order_by('id')
     serializer_class = ParkingLotSerializer
     
+    def get_queryset(self):
+        user = self.request.user  # Get the currently logged-in user
+        queryset = ParkingLot.objects.filter(user=user)  # Assuming owner field is used to link parking lots to users
+        queryset = queryset.annotate(available_slots=Count('parkingslot', filter=Q(parkingslot__is_available=True))).order_by('id')
+        return queryset
+
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
         data = response.data
-        # print('parking lot',data)
         for item in data:
             item['available_slots'] = item.pop('available_slots')
         return Response(data)
@@ -106,7 +124,7 @@ class NearbyParkingLots(APIView):
     def get(self, request):
         user_latitude = float(request.query_params.get('latitude'))
         user_longitude = float(request.query_params.get('longitude'))
-        radius = 10.0  # in kilometers
+        radius = 3.0  # in kilometers
         
         nearby_lots = []
 
@@ -164,7 +182,7 @@ class ParkingSlotCreate(generics.ListCreateAPIView):
 
 class ParkingSlotListByParkingLot(generics.ListAPIView):
     permission_classes = [IsAdminUser]
-    serializer_class = ParkingSlotSerializer
+    serializer_class = ParkingSlotListSerializer
 
     def get_queryset(self):
         # Retrieve the parking lot ID from the URL parameters
@@ -283,25 +301,6 @@ class StartTimerView(generics.CreateAPIView):
 
 # This code calculates the elapsed time in seconds and then converts it to minutes. The rest of the calculation remains the same. Remember to adapt the imports and model names according to your project structure.
 
-# class StopTimerView(generics.UpdateAPIView):
-#     queryset = ParkingBilling.objects.all()
-#     serializer_class = ParkingBillingSerializer
-#     lookup_field = 'pk'
-    
-#     def perform_update(self, serializer):
-#         serializer.instance.end_time = timezone.now()
-
-#         # Calculate elapsed time in minutes
-#         start_time = serializer.instance.start_time
-#         end_time = serializer.instance.end_time
-#         elapsed_time_seconds = (end_time - start_time).total_seconds()
-#         elapsed_time_minutes = elapsed_time_seconds / 60.0  # Time in minutes
-
-#         per_minute_rate = 0.67  # 0.67 paise per minute
-#         total_cost = elapsed_time_minutes * per_minute_rate
-
-#         serializer.instance.total_cost = total_cost
-#         serializer.instance.save(update_fields=['end_time', 'total_cost'])
 
 
 # class StopTimerView(generics.UpdateAPIView):
@@ -342,6 +341,14 @@ class StartTimerView(generics.CreateAPIView):
 #         except Exception as e:
 #             return Response({'error': f'Failed to create FinalBilling record: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+#         # Update the is_available field of the corresponding ParkingSlot to True
+#         try:
+#             parking_slot = instance.parking_slot
+#             parking_slot.is_available = True
+#             parking_slot.save()
+#         except Exception as e:
+#             return Response({'error': f'Failed to update ParkingSlot is_available field: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 #         # Delete the record from ParkingBilling table
 #         try:
 #             instance.delete()
@@ -349,6 +356,101 @@ class StartTimerView(generics.CreateAPIView):
 #             return Response({'error': f'Failed to delete ParkingBilling record: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 #         return Response({'message': 'Timer stopped successfully, record moved to FinalBilling table, and deleted from ParkingBilling table'}, status=status.HTTP_200_OK)
+
+from decimal import Decimal
+
+# class StopTimerView(generics.UpdateAPIView):
+#     queryset = ParkingBilling.objects.all()
+#     serializer_class = ParkingBillingSerializer
+#     lookup_field = 'pk'
+    
+#     def perform_update(self, serializer):
+#         instance = serializer.instance
+#         if instance.end_time:
+#             return Response({'error': 'Timer has already been stopped'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         instance.end_time = timezone.now()
+#         instance.save(update_fields=['end_time'])
+
+#         # Calculate elapsed time in minutes
+#         start_time = instance.start_time
+#         end_time = instance.end_time
+#         elapsed_time_seconds = (end_time - start_time).total_seconds()
+#         elapsed_time_minutes = elapsed_time_seconds / 60.0  # Time in minutes
+
+#         # Get the corresponding ParkingRate based on the vehicle type and parking lot from ParkingSlot
+#         try:
+#             parking_rate = ParkingRate.objects.get(vehicle_type=instance.parking_slot.parking_slot_type, parking_lot=instance.parking_slot.parking_lot)
+#             print('parking_rate',parking_rate)
+#         except ParkingRate.DoesNotExist:
+#             return Response({'error': 'Parking rate not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         # Choose the appropriate rates based on the vehicle type
+#         less_than_hour_rate = parking_rate.less_than_hour
+#         after_one_hour_rate = parking_rate.after_one_hour
+#         after_one_day_rate = parking_rate.after_one_day
+#         after_one_week_rate = parking_rate.after_one_week
+
+#         # Calculate fare based on the rates
+#         total_fare = 0.0
+
+#         # if elapsed_time_minutes < 60:
+#         #     total_fare = elapsed_time_minutes * less_than_hour_rate
+#         # elif elapsed_time_minutes >= 60 and elapsed_time_minutes < 24 * 60:
+#         #     total_fare = elapsed_time_minutes * after_one_hour_rate
+#         # elif elapsed_time_minutes >= 24 * 60 and elapsed_time_minutes < 7 * 24 * 60:
+#         #     total_fare = elapsed_time_minutes * after_one_day_rate
+#         # else:
+#         #     total_fare = elapsed_time_minutes * after_one_week_rate
+
+#         if elapsed_time_minutes < 60:
+#             total_fare = Decimal(elapsed_time_minutes) * less_than_hour_rate
+#         elif elapsed_time_minutes >= 60 and elapsed_time_minutes < 24 * 60:
+#             total_fare = Decimal(elapsed_time_minutes / 60) * after_one_hour_rate
+#         elif elapsed_time_minutes >= 24 * 60 and elapsed_time_minutes < 7 * 24 * 60:
+#             total_fare = Decimal(elapsed_time_minutes / 60) * after_one_day_rate
+#         else:
+#             total_fare = Decimal(elapsed_time_minutes / 60) * after_one_week_rate
+        
+#         print("this is the time used here in the parking lot",elapsed_time_minutes)
+#         print('total_cost of the parking',total_fare)
+        
+#         instance.total_cost = total_fare
+#         instance.save(update_fields=['total_cost'])
+        
+#         try:
+#             # Create a record in FinalBilling table
+#             final_billing_data = {
+#                 'user': instance.user,
+#                 'parking_slot': instance.parking_slot,
+#                 'vehicle_number': instance.vehicle_number,
+#                 'start_time': instance.start_time,
+#                 'end_time': instance.end_time,
+#                 'total_cost': instance.total_cost
+#             }
+#             final_billing = FinalBilling.objects.create(**final_billing_data)
+#             print(f"FinalBilling record created: {final_billing}")
+#         except Exception as e:
+#             return Response({'error': f'Failed to create FinalBilling record: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#         try:
+#             # Update the is_available field of the corresponding ParkingSlot to True
+#             parking_slot = instance.parking_slot
+#             parking_slot.is_available = True
+#             parking_slot.save()
+#             print(f"ParkingSlot availability updated: {parking_slot}")
+#         except Exception as e:
+#             return Response({'error': f'Failed to update ParkingSlot is_available field: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#         try:
+#             # Delete the record from ParkingBilling table
+#             instance.delete()
+#             print("ParkingBilling record deleted")
+#         except Exception as e:
+#             return Response({'error': f'Failed to delete ParkingBilling record: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#         return Response({'message': 'Timer stopped successfully, record moved to FinalBilling table, and deleted from ParkingBilling table'}, status=status.HTTP_200_OK)
+
 
 class StopTimerView(generics.UpdateAPIView):
     queryset = ParkingBilling.objects.all()
@@ -361,6 +463,7 @@ class StopTimerView(generics.UpdateAPIView):
             return Response({'error': 'Timer has already been stopped'}, status=status.HTTP_400_BAD_REQUEST)
 
         instance.end_time = timezone.now()
+        instance.save(update_fields=['end_time'])
 
         # Calculate elapsed time in minutes
         start_time = instance.start_time
@@ -368,12 +471,35 @@ class StopTimerView(generics.UpdateAPIView):
         elapsed_time_seconds = (end_time - start_time).total_seconds()
         elapsed_time_minutes = elapsed_time_seconds / 60.0  # Time in minutes
 
-        per_minute_rate = 0.67  # 0.67 paise per minute
-        total_cost = elapsed_time_minutes * per_minute_rate
+        # Get the corresponding ParkingRate based on the vehicle type and parking lot from ParkingSlot
+        try:
+            parking_rate = ParkingRate.objects.get(vehicle_type=instance.parking_slot.parking_slot_type, parking_lot=instance.parking_slot.parking_lot)
+            print('parking_rate',parking_rate)
+        except ParkingRate.DoesNotExist:
+            return Response({'error': 'Parking rate not found'}, status=status.HTTP_400_BAD_REQUEST)
 
-        instance.total_cost = total_cost
-        instance.save(update_fields=['end_time', 'total_cost'])
-
+        # Choose the appropriate rates based on the vehicle type
+        if elapsed_time_minutes < 60:
+            total_fare = parking_rate.upto_1_hr
+        elif elapsed_time_minutes < 5 * 60:
+            total_fare = parking_rate.above_1_hr_upto_5_hr
+        elif elapsed_time_minutes < 24 * 60:
+            total_fare = parking_rate.above_5_hr_and_upto_24_hr
+        elif elapsed_time_minutes < 3 * 24 * 60:
+            total_fare = parking_rate.above_1_day_and_upto_3_days
+        elif elapsed_time_minutes < 7 * 24 * 60:
+            total_fare = parking_rate.above_3_days_and_upto_7_days
+        elif elapsed_time_minutes < 14 * 24 * 60:
+            total_fare = parking_rate.above_1_week_and_upto_2_weeks
+        else:
+            total_fare = parking_rate.above_2_week_and_upto_1_month
+        
+        print("this is the time used here in the parking lot",elapsed_time_minutes)
+        print('total_cost of the parking',total_fare)
+        
+        instance.total_cost = Decimal(total_fare)
+        instance.save(update_fields=['total_cost'])
+        
         try:
             # Create a record in FinalBilling table
             final_billing_data = {
@@ -384,25 +510,30 @@ class StopTimerView(generics.UpdateAPIView):
                 'end_time': instance.end_time,
                 'total_cost': instance.total_cost
             }
-            FinalBilling.objects.create(**final_billing_data)
+            final_billing = FinalBilling.objects.create(**final_billing_data)
+            print(f"FinalBilling record created: {final_billing}")
         except Exception as e:
             return Response({'error': f'Failed to create FinalBilling record: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Update the is_available field of the corresponding ParkingSlot to True
         try:
+            # Update the is_available field of the corresponding ParkingSlot to True
             parking_slot = instance.parking_slot
             parking_slot.is_available = True
             parking_slot.save()
+            print(f"ParkingSlot availability updated: {parking_slot}")
         except Exception as e:
             return Response({'error': f'Failed to update ParkingSlot is_available field: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Delete the record from ParkingBilling table
         try:
+            # Delete the record from ParkingBilling table
             instance.delete()
+            print("ParkingBilling record deleted")
         except Exception as e:
             return Response({'error': f'Failed to delete ParkingBilling record: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({'message': 'Timer stopped successfully, record moved to FinalBilling table, and deleted from ParkingBilling table'}, status=status.HTTP_200_OK)
+
+
 ############################## Parking Billing State ################################
 
 
@@ -455,9 +586,22 @@ class BiilingPerPerson(generics.ListAPIView):
         # Get the authenticated user
         user = self.request.user
 
-        # Filter the billings where the user is responsible
-        queryset = FinalBilling.objects.filter(user=user)
-        
-        return queryset
- 
+        # Check if the user is staff
+        if user.is_staff:
+            # If the user is staff, get the parking lots associated with them
+            staff_parking_lots = ParkingLot.objects.filter(user=user)
 
+            # Filter the billings based on parking lots associated with the staff member
+            queryset = FinalBilling.objects.filter(parking_slot__parking_lot__in=staff_parking_lots)
+        else:
+            # For non-staff users, filter billings where the user is responsible
+            queryset = FinalBilling.objects.filter(user=user)
+
+        return queryset
+
+
+
+class ParkingRateCreate(generics.ListCreateAPIView):
+    permission_classes = [IsAdminUser]
+    queryset = ParkingRate.objects.all()
+    serializer_class = ParkingRateSerializer

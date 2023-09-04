@@ -4,13 +4,20 @@ from . import views
 from parking_app.rest_views.parkingview import * 
 
 urlpatterns = [
-    ####### user routes ##############
+    ############### user routes ##################
     path('signup/',views.SignUp.as_view(),name='signup'),
     path('verify/<str:email>/',views.VerifyOtpView.as_view(), name='VerifyEmail'),
     path('signin/', views.SignInView.as_view(), name='signin'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('user_list/',views.UserList.as_view(),name="userlist"),
+    path('check_user_status/', views.CheckUserStatusView.as_view(), name='check_user_status'),
     # path('send-otp/', views.SendOTP.as_view(), name='send-otp'),
+
+    ########################## Admin urls ###########################
+
+    path('admin-signup/', views.AdminSignupView.as_view(), name='admin-signup'),
+    path('staff-signup/',views.StaffSignupView.as_view(),name='staff-signup'),
+    
     ################## parking lot urls ############
     path('nearest_parking_lots/', NearbyParkingLots.as_view(), name='nearest_parking_lots'),
     path('parking_lot_create/',ParkingLotCreateView.as_view(),name='create_parking_create'),
@@ -27,4 +34,5 @@ urlpatterns = [
     ################ subscribing and contact us #######################
     path('subscriber/',SubscriberView.as_view(),name='subscriber'),
     path('contactus/',ContactUsView.as_view(),name='contactus'),
+    path('parking_rates_all/',ParkingRateCreate.as_view(),name='parking-rates'),
 ]

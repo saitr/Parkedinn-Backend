@@ -49,7 +49,7 @@ class ParkingLotSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ParkingLot
-        fields = ['id', 'name', 'address', 'description', 'image', 'latitude', 'longitude','available_slots']
+        fields = ['id', 'name', 'address', 'description', 'image', 'latitude', 'longitude','available_slots','parking_type','user']
 
 
 ################ Parking Slot Serializer ###############
@@ -57,16 +57,14 @@ class ParkingLotSerializer(serializers.ModelSerializer):
 class ParkingSlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = ParkingSlot
-        fields = '__all__'
-        depth = 2
+        fields = ['id','parking_lot','slot_number','parking_slot_type','is_available']
+        # depth = 2
 
-
-# class ParkingBillingSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = ParkingBilling
-#         fields = '__all__'
-        # depth = 1
-
+class ParkingSlotListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ParkingSlot
+        fields = ['id','parking_lot','slot_number','parking_slot_type','is_available']
+        depth=2
 
 ########################## Billing Serializer ######################
 
@@ -88,6 +86,7 @@ class ParkingBillingSerializer(serializers.ModelSerializer):
             total_cost = Decimal(minutes * 0.67)
             return total_cost
         return Decimal(0)
+
 
 
 class ParkingBillingDetailSerializer(serializers.ModelSerializer):
@@ -143,3 +142,51 @@ class FinalBillingSerializer(serializers.ModelSerializer):
         depth= 2
 
 
+class ParkingRateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ParkingRate
+        fields = ['vehicle_type','parking_lot','upto_1_hr','above_1_hr_upto_5_hr','above_5_hr_and_upto_24_hr','above_1_day_and_upto_3_days','above_3_days_and_upto_7_days','above_1_week_and_upto_2_weeks','above_2_week_and_upto_1_month']
+        # depth = 1
+
+
+
+
+################# Admin signup Serializer ######################
+
+
+class AdminSignupSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = CustomUser
+        fields = ('id', 'email', 'username', 'phone_number', 'password')
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = CustomUser.objects.create_superuser(
+            password=password,
+            **validated_data,
+            is_active=True  # You might want to ensure the user is active as well
+        )
+        return user
+
+
+#################### Staff Signup Serializer ##########################
+
+class StaffSignupSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = CustomUser
+        fields = ('id', 'email', 'username', 'phone_number', 'password',)
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = CustomUser.objects.create_user(
+            password=password,
+            is_staff = True,
+            is_superuser=False,  # Set is_superuser to False for staff user
+            **validated_data,
+            is_active=True  # You might want to ensure the user is active as well
+        )
+        return user

@@ -131,6 +131,76 @@ class UserList(generics.ListAPIView):
     
 
 
+###################### Admin Signup View #########################
+
+
+# class AdminSignupView(APIView):
+#     def post(self, request):
+#         serializer = AdminSignupSerializer(data=request.data)
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data, status=status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class AdminSignupView(APIView):
+    def post(self, request):
+        serializer = AdminSignupSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+
+            # Generate tokens
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+
+            return Response(
+                {
+                    "access_token": access_token,
+                    "refresh_token": str(refresh),
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class StaffSignupView(APIView):
+    # def post(self, request):
+    #     serializer = StaffSignupSerializer(data=request.data)
+    #     if serializer.is_valid():
+    #         serializer.save()
+    #         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request):
+        serializer = StaffSignupSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+
+            # Generate tokens
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+
+            return Response(
+                {
+                    "access_token": access_token,
+                    "refresh_token": str(refresh),
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+######################### To check the user Status ##################################
+
+class CheckUserStatusView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def retrieve(self, request, *args, **kwargs):
+        user = self.request.user
+
+        if user.is_staff or user.is_superuser:
+            return Response({'is_staff_or_superuser': True}, status=status.HTTP_200_OK)
+        else:
+            return Response({'is_staff_or_superuser': False}, status=status.HTTP_200_OK)
+    
+
 # views.py
 # import random
 # from rest_framework.views import APIView
